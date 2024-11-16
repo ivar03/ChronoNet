@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".HomeActivity">
+
+    <org.mozilla.geckoview.GeckoView
+        android:id="@+id/geckoview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        />
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:visibility="gone"
+        android:progress="0"
+        android:max="100"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_above="@+id/btm_nav"/>
+
+
+    <LinearLayout
+        android:id="@+id/btm_nav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_alignParentBottom="true"
+        android:background="@drawable/btm_nav_bg">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:layout_marginTop="2dp"
+            android:padding="15dp">
+
+            <ImageView
+                android:id="@+id/home_btn"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:background="@drawable/home_icon"
+                android:backgroundTint="@color/white"
+                android:layout_marginStart="5dp"/>
+
+            <EditText
+                android:id="@+id/search_et"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/searchbar_bg"
+                android:backgroundTint="#464646"
+                android:layout_marginStart="11dp"
+                android:layout_marginEnd="5dp"
+                android:textColor="@color/white"
+                android:hint="Search or enter address"
+                android:layout_weight="1"
+                android:inputType="textUri"
+                android:textSize="12sp"
+                android:paddingVertical="10dp"
+                android:focusable="true"
+                android:paddingHorizontal="13dp"
+                android:textColorHint="@color/white"
+                android:imeOptions="actionSearch"/>
+
+
+            <ImageView
+                android:id="@+id/options_btn"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:background="@drawable/more_icon"
+                android:backgroundTint="@color/white"/>
+
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</RelativeLayout>
