@@ -7,11 +7,59 @@
     android:layout_height="match_parent"
     tools:context=".HomeActivity">
 
+    <ImageView
+        android:id="@+id/background_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentBottom="true"
+        android:scaleType="centerCrop" />
+
+    <LinearLayout
+        android:id="@+id/time_ll"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="200dp"
+        android:layout_centerHorizontal="true">
+
+        <TextView
+            android:id="@+id/time_tv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="12:00"
+            android:textSize="80sp"
+            android:textStyle="bold"
+            android:textColor="@color/white"/>
+
+        <TextView
+            android:id="@+id/am_pm_tv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="A.M"
+            android:textSize="30sp"
+            android:textStyle="bold"
+            android:textColor="@color/white"
+            android:layout_marginStart="5dp"/>
+
+    </LinearLayout>
+    <TextView
+        android:id="@+id/weather_tv"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Weather: 16 C, rainy"
+        android:textSize="20sp"
+        android:textColor="@color/white"
+        android:layout_below="@+id/time_ll"
+        android:textAlignment="center"/>
+
     <org.mozilla.geckoview.GeckoView
         android:id="@+id/geckoview"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        />
+        android:visibility="gone"/>
 
     <ProgressBar
         android:id="@+id/progressBar"
@@ -20,6 +68,8 @@
         android:visibility="gone"
         android:progress="0"
         android:max="100"
+        android:progressBackgroundTint="#00000000"
+        android:progressTint="@color/dark_red"
         style="@android:style/Widget.ProgressBar.Horizontal"
         android:layout_above="@+id/btm_nav"/>
 
@@ -67,6 +117,17 @@
                 android:paddingHorizontal="13dp"
                 android:textColorHint="@color/white"
                 android:imeOptions="actionSearch"/>
+
+            <TextView
+                android:id="@+id/tab_btn"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:text="1"
+                android:textSize="10sp"
+                android:textColor="@color/white"
+                android:background="@drawable/searchbar_bg"
+                android:gravity="center"
+                android:layout_marginHorizontal="5dp"/>
 
 
             <ImageView

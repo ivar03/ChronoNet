@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@color/dark_gray">
+
+    <!-- Horizontal layout for icons -->
+    <LinearLayout
+        android:id="@+id/horizontal_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:padding="8dp">
+
+        <ImageView
+            android:id="@+id/forward_icon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_margin="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:src="@drawable/forward_icon" />
+
+        <ImageView
+            android:id="@+id/backward_icon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_margin="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:src="@drawable/backward_icon" />
+
+        <ImageView
+            android:id="@+id/star_icon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_margin="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:src="@drawable/star_icon" />
+
+        <ImageView
+            android:id="@+id/reload_icon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_margin="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:src="@drawable/reload_icon" />
+    </LinearLayout>
+
+    <!-- Vertical layout for menu items -->
+    <LinearLayout
+        android:id="@+id/vertical_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="8dp">
+
+        <TextView
+            android:id="@+id/history_item"
+            style="@style/PopupMenuItem"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="History"
+            android:textColor="@color/white"/>
+
+        <TextView
+            android:id="@+id/bookmarks_item"
+            style="@style/PopupMenuItem"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Bookmarks"
+            android:textColor="@color/white" />
+
+        <TextView
+            android:id="@+id/delete_history_item"
+            style="@style/PopupMenuItem"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Delete Browsing History"
+            android:textColor="@color/white" />
+
+        <TextView
+            android:id="@+id/settings_item"
+            style="@style/PopupMenuItem"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Settings"
+            android:textColor="@color/white" />
+
+        <TextView
+            android:id="@+id/incognito_item"
+            style="@style/PopupMenuItem"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Incognito Mode"
+            android:textColor="@color/white" />
+
+        <TextView
+            android:id="@+id/new_tab_item"
+            style="@style/PopupMenuItem"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="New Tab"
+            android:textColor="@color/white" />
+    </LinearLayout>
+
+</LinearLayout>

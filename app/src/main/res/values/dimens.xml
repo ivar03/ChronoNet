@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="icon_size">25dp</dimen>
+    <dimen name="icon_margin">8dp</dimen>
+    <dimen name="menu_item_padding_horizontal">16dp</dimen>
+    <dimen name="menu_item_padding_vertical">12dp</dimen>
+    <dimen name="popup_vertical_offset">20dp</dimen>
+    <dimen name="popup_horizontal_offset">16dp</dimen>
+</resources>
