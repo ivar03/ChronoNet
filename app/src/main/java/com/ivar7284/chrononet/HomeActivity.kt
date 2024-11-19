@@ -1,6 +1,7 @@
 package com.ivar7284.chrononet
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.os.Bundle
@@ -24,9 +25,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.location.FusedLocationProviderClient
+import com.ivar7284.chrononet.dataclasses.HistoryEntry
 import com.ivar7284.chrononet.dataclasses.WeatherResponse
+import com.ivar7284.chrononet.functions.HistoryDatabase
+import com.ivar7284.chrononet.utils.HistoryDao
 import com.ivar7284.chrononet.utils.RetrofitInstance
+import kotlinx.coroutines.launch
 import org.mozilla.geckoview.AllowOrDeny
 import org.mozilla.geckoview.BuildConfig
 import org.mozilla.geckoview.GeckoResult
@@ -45,6 +51,9 @@ import java.util.Timer
 import kotlin.concurrent.timerTask
 
 class HomeActivity : AppCompatActivity() {
+
+    private lateinit var db: HistoryDatabase
+    private lateinit var historyDao: HistoryDao
 
     private lateinit var timeTv: TextView
     private lateinit var amPmTv: TextView
@@ -79,6 +88,10 @@ class HomeActivity : AppCompatActivity() {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+
+        //database initialization
+        db = HistoryDatabase.getDatabase(this)
+        historyDao = db.historyDao()
 
         //home page background setup
         val layout: ImageView = findViewById(R.id.background_image)
@@ -256,6 +269,7 @@ class HomeActivity : AppCompatActivity() {
         // Set click listeners for menu items
         menuItems[0].setOnClickListener {
             //todo:openHistory()
+            startActivity(Intent(applicationContext, HistoryActivity::class.java))
             popupWindow.dismiss()
         }
         menuItems[1].setOnClickListener {
@@ -263,7 +277,7 @@ class HomeActivity : AppCompatActivity() {
             popupWindow.dismiss()
         }
         menuItems[2].setOnClickListener {
-            //todo:deleteBrowsingHistory()
+            //todo: left
             popupWindow.dismiss()
         }
         menuItems[3].setOnClickListener {
@@ -301,7 +315,6 @@ class HomeActivity : AppCompatActivity() {
             yOffset
         )
     }
-
 
     // Helper function to create a menu item TextView with improved styling
     private fun createMenuItem(text: String): TextView {
@@ -348,6 +361,7 @@ class HomeActivity : AppCompatActivity() {
             override fun onLocationChange(session: GeckoSession, url: String?) {
                 if (url != "about:blank")
                     searchUrl.setText(url)
+                    saveHistory(url.toString())
             }
         })
 
@@ -384,6 +398,13 @@ class HomeActivity : AppCompatActivity() {
             } else {
                 false
             }
+        }
+    }
+
+    private fun saveHistory(url: String) {
+        lifecycleScope.launch {
+            val historyEntry = HistoryEntry(url = url)
+            historyDao.insertHistory(historyEntry)
         }
     }
 
