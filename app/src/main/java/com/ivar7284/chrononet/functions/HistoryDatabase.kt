@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import com.ivar7284.chrononet.dataclasses.HistoryEntry
 import com.ivar7284.chrononet.utils.HistoryDao
 
-@Database(entities = [HistoryEntry::class], version = 1)
+@Database(entities = [HistoryEntry::class], version = 1, exportSchema = true)
 abstract class HistoryDatabase : RoomDatabase() {
     abstract fun historyDao(): HistoryDao
 

@@ -1,0 +1,41 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginTop="5dp"
+        android:paddingHorizontal="10dp">
+        <TextView
+            android:id="@+id/tab_count_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            android:layout_weight="1"
+            android:text="Tabs: 0"
+            android:textSize="16sp" />
+
+        <ImageButton
+            android:id="@+id/new_tab_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/add_icon"
+            android:contentDescription="New Tab"
+            android:layout_margin="8dp" />
+    </LinearLayout>
+
+    <ScrollView
+        android:id="@+id/scroll_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/tab_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+    </ScrollView>
+</LinearLayout>

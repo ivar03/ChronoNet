@@ -8,15 +8,16 @@ import com.ivar7284.chrononet.dataclasses.HistoryEntry
 
 @Dao
 interface HistoryDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert
     suspend fun insertHistory(historyEntry: HistoryEntry)
 
-    @Query("SELECT * FROM browsing_history ORDER BY timestamp DESC")
+    @Query("SELECT * FROM history_table ORDER BY timestamp DESC")
     suspend fun getAllHistory(): List<HistoryEntry>
 
-    @Query("DELETE FROM browsing_history")
+    @Query("DELETE FROM history_table")
     suspend fun clearHistory()
 
-    @Query("DELETE FROM browsing_history WHERE id = :id")
+    @Query("DELETE FROM history_table WHERE id = :id")
     suspend fun deleteHistoryEntry(id: Int)
 }
+

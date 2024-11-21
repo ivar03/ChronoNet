@@ -23,6 +23,9 @@
             android:name=".HistoryActivity"
             android:exported="false" />
         <activity
+            android:name=".TabListActivity"
+            android:exported="false"/>
+        <activity
             android:name=".HomeActivity"
             android:exported="true">
             <intent-filter>

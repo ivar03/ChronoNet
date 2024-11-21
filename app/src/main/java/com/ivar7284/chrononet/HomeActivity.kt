@@ -30,9 +30,13 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.ivar7284.chrononet.dataclasses.HistoryEntry
 import com.ivar7284.chrononet.dataclasses.WeatherResponse
 import com.ivar7284.chrononet.functions.HistoryDatabase
+import com.ivar7284.chrononet.functions.TabManager
 import com.ivar7284.chrononet.utils.HistoryDao
 import com.ivar7284.chrononet.utils.RetrofitInstance
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.mozilla.geckoview.AllowOrDeny
 import org.mozilla.geckoview.BuildConfig
 import org.mozilla.geckoview.GeckoResult
@@ -64,6 +68,8 @@ class HomeActivity : AppCompatActivity() {
     private lateinit var optionBtn: ImageView
     private lateinit var progressBar: ProgressBar
     private lateinit var tabBtn: TextView
+
+    private val tabManager by lazy { TabManager.getInstance(this) }
 
     private lateinit var geckoView: GeckoView
     private lateinit var session: GeckoSession
@@ -116,23 +122,33 @@ class HomeActivity : AppCompatActivity() {
         // initializing views
         initializeViews()
 
+        // initialize tab function
+        initializeTabFunctionality()
+
         // Setup GeckoView
         setupGeckoView()
 
-        // functions setups
         // todo:select all text when search has focus/ is click upon
         homeBtn.setOnClickListener {
-            session.close()
-            session = GeckoSession()
-            geckoView.visibility = View.GONE
+            if (tabManager.getTabCount() > 1) {
+                // Launch a coroutine just for the closeTab operation
+                CoroutineScope(Dispatchers.Main).launch {
+                    val currentIndex = tabManager.currentTabIndex.value ?: return@launch
+                    tabManager.closeTab(currentIndex)
 
-            timeTv.visibility = View.VISIBLE
-            amPmTv.visibility = View.VISIBLE
-            weather.visibility = View.VISIBLE
-
-            searchUrl.text.clear()
-
-            updateTimeAndWeather()
+                    // Continue with the original synchronous logic
+                    updateTabCountDisplay()
+                    val previousTab = tabManager.getCurrentTab()
+                    if (previousTab != null) {
+                        geckoView.setSession(previousTab.session)
+                        searchUrl.setText(previousTab.url)
+                    } else {
+                        resetToHomeScreen()
+                    }
+                }
+            } else {
+                resetToHomeScreen()
+            }
         }
 
         optionBtn.setOnClickListener { view ->
@@ -140,6 +156,19 @@ class HomeActivity : AppCompatActivity() {
         }
 
 
+    }
+
+    private fun updateTabCountDisplay() {
+        tabBtn.text = "${tabManager.getTabCount()}"
+    }
+
+    private fun initializeTabFunctionality() {
+        // Open tab list activity when tab button is clicked
+        tabBtn.setOnClickListener {
+            startActivity(Intent(this, TabListActivity::class.java))
+        }
+        // Update tab count display
+        updateTabCountDisplay()
     }
 
     // custom popup function:
@@ -289,8 +318,11 @@ class HomeActivity : AppCompatActivity() {
             popupWindow.dismiss()
         }
         menuItems[5].setOnClickListener {
-            //todo:openNewTab()
-            popupWindow.dismiss()
+            CoroutineScope(Dispatchers.Main).launch {
+                val newTab = tabManager.createNewTab("about:blank", "New Tab")
+                updateTabCountDisplay()
+                popupWindow.dismiss()
+            }
         }
 
         // Measure the popup layout
@@ -335,68 +367,85 @@ class HomeActivity : AppCompatActivity() {
         optionBtn = findViewById(R.id.options_btn)
         progressBar = findViewById(R.id.progressBar)
         tabBtn = findViewById(R.id.tab_btn)
+        geckoView = findViewById(R.id.geckoview)
     }
 
     private fun setupGeckoView() {
-        geckoView = findViewById(R.id.geckoview)
-        session = GeckoSession()
-
-        session.setContentDelegate(object : GeckoSession.ContentDelegate {})
-        session.setProgressDelegate(object: GeckoSession.ProgressDelegate{
-            override fun onProgressChange(session: GeckoSession, progress: Int) {
-                progressBar.progress = progress
-                if (progress == 100) progressBar.visibility = ProgressBar.GONE
+        lifecycleScope.launch {
+            // Get or create the current tab
+            val currentTab = tabManager.getCurrentTab() ?: withContext(Dispatchers.Main) {
+                tabManager.createNewTab("about:blank", "New Tab")
             }
 
-            override fun onPageStart(session: GeckoSession, url: String) {
-                progressBar.visibility = ProgressBar.VISIBLE
-                progressBar.progress = 0
-            }
-
-            override fun onPageStop(session: GeckoSession, success: Boolean) {
-                progressBar.visibility = ProgressBar.GONE
-            }
-        })
-        session.setNavigationDelegate(object : NavigationDelegate {
-            override fun onLocationChange(session: GeckoSession, url: String?) {
-                if (url != "about:blank")
-                    searchUrl.setText(url)
-                    saveHistory(url.toString())
-            }
-        })
-
-
-        if (sRuntime == null) sRuntime = GeckoRuntime.create(this)
-
-        session.open(sRuntime!!)
-        geckoView.setSession(session)
-
-        // Use imeOptions to handle "Enter" or "Search" button on the keyboard
-        searchUrl.setImeOptions(EditorInfo.IME_ACTION_SEARCH)
-        searchUrl.setOnEditorActionListener { v, actionId, event ->
-            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-
-                // Close keyboard automatically
-                closeKeyboard()
-
-                // Handle search action
-                val url = searchUrl.text.trim().toString()
-
-                if (url.isNotEmpty()) {
-                    session.close()
-                    session = GeckoSession()
-                    setupGeckoView()
-
-                    geckoView.visibility = View.VISIBLE
-                    timeTv.visibility = View.GONE
-                    amPmTv.visibility = View.GONE
-                    weather.visibility = View.GONE
-                    session.loadUri(url)
-                    searchUrl.clearFocus()
+            session = currentTab.session
+            session.setContentDelegate(object : GeckoSession.ContentDelegate {})
+            session.setProgressDelegate(object: GeckoSession.ProgressDelegate {
+                override fun onProgressChange(session: GeckoSession, progress: Int) {
+                    progressBar.progress = progress
+                    if (progress == 100) progressBar.visibility = ProgressBar.GONE
                 }
-                true // Indicate that the action was handled
-            } else {
-                false
+
+                override fun onPageStart(session: GeckoSession, url: String) {
+                    progressBar.visibility = ProgressBar.VISIBLE
+                    progressBar.progress = 0
+                }
+
+                override fun onPageStop(session: GeckoSession, success: Boolean) {
+                    progressBar.visibility = ProgressBar.GONE
+                }
+            })
+
+            session.setNavigationDelegate(object : NavigationDelegate {
+                override fun onLocationChange(session: GeckoSession, url: String?) {
+                    if (url != "about:blank") {
+                        searchUrl.setText(url)
+                        saveHistory(url.toString())
+
+                        // fetch title
+                        session.setContentDelegate(object: GeckoSession.ContentDelegate {
+                            override fun onTitleChange(session: GeckoSession, title: String?) {
+                                currentTab.url = url
+                                currentTab.title = title ?: "New Tab"
+                            }
+                        })
+                    }
+                }
+            })
+
+            if (sRuntime == null) sRuntime = GeckoRuntime.create(this@HomeActivity)
+
+            session.open(sRuntime!!)
+            geckoView.setSession(session)
+
+            // Use imeOptions to handle "Enter" or "Search" button on the keyboard
+            searchUrl.setImeOptions(EditorInfo.IME_ACTION_SEARCH)
+            searchUrl.setOnEditorActionListener { v, actionId, event ->
+                if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                    // Close keyboard automatically
+                    closeKeyboard()
+
+                    // Handle search action
+                    val url = searchUrl.text.trim().toString()
+
+                    if (url.isNotEmpty()) {
+                        val tab = currentTab
+                        tab.session.loadUri(url)
+
+                        geckoView.visibility = View.VISIBLE
+                        timeTv.visibility = View.GONE
+                        amPmTv.visibility = View.GONE
+                        weather.visibility = View.GONE
+                        session.loadUri(url)
+                        searchUrl.clearFocus()
+
+                        // update tab info
+                        tab.url = url
+                        updateTabCountDisplay()
+                    }
+                    true // Indicate that the action was handled
+                } else {
+                    false
+                }
             }
         }
     }
@@ -453,6 +502,18 @@ class HomeActivity : AppCompatActivity() {
     private fun closeKeyboard() {
         val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
         imm.hideSoftInputFromWindow(searchUrl.windowToken, 0)
+    }
+
+    private fun resetToHomeScreen() {
+        session.close()
+        geckoView.visibility = View.GONE
+
+        timeTv.visibility = View.VISIBLE
+        amPmTv.visibility = View.VISIBLE
+        weather.visibility = View.VISIBLE
+
+        searchUrl.text.clear()
+        updateTimeAndWeather()
     }
 
     override fun onDestroy() {
