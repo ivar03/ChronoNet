@@ -3,48 +3,35 @@ package com.ivar7284.chrononet
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.BitmapFactory
-import android.graphics.Color
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
-import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.PopupMenu
 import android.widget.PopupWindow
-import android.widget.ProgressBar
-import android.widget.RelativeLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.ivar7284.chrononet.dataclasses.HistoryEntry
+import com.ivar7284.chrononet.dataclasses.TabEntity
 import com.ivar7284.chrononet.dataclasses.WeatherResponse
+import com.ivar7284.chrononet.fragments.TabFragment
+import com.ivar7284.chrononet.fragments.TabSelectorFragment
 import com.ivar7284.chrononet.functions.HistoryDatabase
-import com.ivar7284.chrononet.functions.TabManager
+import com.ivar7284.chrononet.functions.TabDatabase
+import com.ivar7284.chrononet.utils.GeckoRuntimeSingleton
 import com.ivar7284.chrononet.utils.HistoryDao
 import com.ivar7284.chrononet.utils.RetrofitInstance
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import com.ivar7284.chrononet.utils.UrlUpdateListener
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.mozilla.geckoview.AllowOrDeny
-import org.mozilla.geckoview.BuildConfig
-import org.mozilla.geckoview.GeckoResult
-import org.mozilla.geckoview.GeckoRuntime
-import org.mozilla.geckoview.GeckoSession
-import org.mozilla.geckoview.GeckoView
-import org.mozilla.geckoview.GeckoSession.NavigationDelegate
-import org.mozilla.geckoview.WebRequestError
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -54,10 +41,11 @@ import java.util.Locale
 import java.util.Timer
 import kotlin.concurrent.timerTask
 
-class HomeActivity : AppCompatActivity() {
+class HomeActivity : AppCompatActivity(), UrlUpdateListener {
 
     private lateinit var db: HistoryDatabase
     private lateinit var historyDao: HistoryDao
+    private lateinit var tabDatabase: TabDatabase
 
     private lateinit var timeTv: TextView
     private lateinit var amPmTv: TextView
@@ -66,15 +54,10 @@ class HomeActivity : AppCompatActivity() {
     private lateinit var searchUrl: EditText
     private lateinit var homeBtn: ImageView
     private lateinit var optionBtn: ImageView
-    private lateinit var progressBar: ProgressBar
     private lateinit var tabBtn: TextView
+    private lateinit var frameLayout: FrameLayout
 
-    private val tabManager by lazy { TabManager.getInstance(this) }
-
-    private lateinit var geckoView: GeckoView
-    private lateinit var session: GeckoSession
-
-    private var sRuntime: GeckoRuntime? = null
+    var currentActiveFragment: TabFragment? = null
 
     @SuppressLint("MissingInflatedId")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -98,6 +81,10 @@ class HomeActivity : AppCompatActivity() {
         //database initialization
         db = HistoryDatabase.getDatabase(this)
         historyDao = db.historyDao()
+        tabDatabase = TabDatabase.getDatabase(this)
+        lifecycleScope.launch {
+            tabDatabase.tabDao().ensureTabExists()
+        }
 
         //home page background setup
         val layout: ImageView = findViewById(R.id.background_image)
@@ -122,31 +109,27 @@ class HomeActivity : AppCompatActivity() {
         // initializing views
         initializeViews()
 
-        // initialize tab function
-        initializeTabFunctionality()
-
-        // Setup GeckoView
-        setupGeckoView()
+        // search url
+        searchUrl.setImeOptions(EditorInfo.IME_ACTION_SEARCH)
+        searchUrl.setOnEditorActionListener { v, actionId, event ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                closeKeyboard()
+                val url = searchUrl.text.trim().toString()
+                if (url.isNotEmpty()){
+                    // update tab
+                    updateExistingTab(url)
+                }
+                true
+            } else {
+                false
+            }
+        }
 
         // todo:select all text when search has focus/ is click upon
         homeBtn.setOnClickListener {
-            if (tabManager.getTabCount() > 1) {
-                // Launch a coroutine just for the closeTab operation
-                CoroutineScope(Dispatchers.Main).launch {
-                    val currentIndex = tabManager.currentTabIndex.value ?: return@launch
-                    tabManager.closeTab(currentIndex)
-
-                    // Continue with the original synchronous logic
-                    updateTabCountDisplay()
-                    val previousTab = tabManager.getCurrentTab()
-                    if (previousTab != null) {
-                        geckoView.setSession(previousTab.session)
-                        searchUrl.setText(previousTab.url)
-                    } else {
-                        resetToHomeScreen()
-                    }
-                }
-            } else {
+            // check if fragment is visible if visible make it disappear and reset the home screen
+            if (frameLayout.visibility == View.VISIBLE){
+                frameLayout.visibility = View.GONE
                 resetToHomeScreen()
             }
         }
@@ -155,20 +138,124 @@ class HomeActivity : AppCompatActivity() {
             popupMenu(view)
         }
 
-
-    }
-
-    private fun updateTabCountDisplay() {
-        tabBtn.text = "${tabManager.getTabCount()}"
-    }
-
-    private fun initializeTabFunctionality() {
-        // Open tab list activity when tab button is clicked
         tabBtn.setOnClickListener {
-            startActivity(Intent(this, TabListActivity::class.java))
+            //todo: close all the previously open session for geckoview
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.frag_home, TabSelectorFragment())
+                .addToBackStack(null)
+                .commit()
         }
-        // Update tab count display
-        updateTabCountDisplay()
+
+
+    }
+
+    private fun updateExistingTab(url: String) {
+        lifecycleScope.launch {
+            val tabDao = tabDatabase.tabDao()
+
+            // Close the current active session if exists
+            currentActiveFragment?.closeSession()
+
+            // Get the existing single tab
+            val existingTab = tabDao.getSingleTab() ?: return@launch
+
+            // Update the tab's URL
+            val updatedTab = existingTab.copy(
+                url = url,
+                timestamp = System.currentTimeMillis()
+            )
+
+            // Update the tab in the database
+            tabDao.updateTab(updatedTab)
+
+            // Setup and show fragment
+            frameLayout.visibility = View.VISIBLE
+            timeTv.visibility = View.GONE
+            amPmTv.visibility = View.GONE
+            weather.visibility = View.GONE
+
+            // Create new fragment and store reference
+            val fragment = TabFragment().apply {
+                arguments = Bundle().apply {
+                    putString("URL", url)
+                }
+            }
+            currentActiveFragment = fragment
+
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.frag_home, fragment)
+                .commit()
+
+            searchUrl.clearFocus()
+        }
+    }
+
+    private fun setupFragment(url: String){
+        val fragment = TabFragment().apply {
+            arguments = Bundle().apply {
+                putString("URL", url)
+            }
+        }
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.frag_home, fragment)
+            .commit()
+    }
+
+    private fun addNewTab(url: String) {
+        lifecycleScope.launch {
+            val tabDatabase = TabDatabase.getDatabase(this@HomeActivity)
+            val tabDao = tabDatabase.tabDao()
+
+            // Clear active tabs
+            tabDao.clearActiveTabs()
+
+            // Insert new tab
+            val newTab = TabEntity(
+                url = url,
+                title = null, // You can fetch title later
+                isActive = true
+            )
+            tabDao.insertTab(newTab)
+        }
+    }
+
+    private fun createNewTab() {
+        lifecycleScope.launch {
+            val tabDao = tabDatabase.tabDao()
+
+            // Close the current active session if exists
+            currentActiveFragment?.closeSession()
+
+            // Insert a new tab with a default URL
+            val newTab = TabEntity(
+                url = "about:blank",
+                title = "New Tab",
+                isActive = true,
+                timestamp = System.currentTimeMillis()
+            )
+            tabDao.clearActiveTabs()
+            tabDao.insertTab(newTab)
+
+            // Optionally, update the UI to show the new tab
+            frameLayout.visibility = View.VISIBLE
+
+            // Create new fragment and store reference
+            val fragment = TabFragment().apply {
+                arguments = Bundle().apply {
+                    putString("URL", "about:blank")
+                }
+            }
+            currentActiveFragment = fragment
+
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.frag_home, fragment)
+                .commit()
+        }
+    }
+
+    private fun closeKeyboard() {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(searchUrl.windowToken, 0)
     }
 
     // custom popup function:
@@ -251,11 +338,11 @@ class HomeActivity : AppCompatActivity() {
 
         // Set click listeners for each icon
         forwardIcon.setOnClickListener {
-            session.goForward()
+            //session.goForward()
             popupWindow.dismiss()
         }
         backwardIcon.setOnClickListener {
-            session.goBack()
+            //session.goBack()
             popupWindow.dismiss()
         }
         starIcon.setOnClickListener {
@@ -264,7 +351,7 @@ class HomeActivity : AppCompatActivity() {
             popupWindow.dismiss()
         }
         reloadIcon.setOnClickListener {
-            session.reload()
+            //session.reload()
             popupWindow.dismiss()
         }
 
@@ -318,11 +405,8 @@ class HomeActivity : AppCompatActivity() {
             popupWindow.dismiss()
         }
         menuItems[5].setOnClickListener {
-            CoroutineScope(Dispatchers.Main).launch {
-                val newTab = tabManager.createNewTab("about:blank", "New Tab")
-                updateTabCountDisplay()
-                popupWindow.dismiss()
-            }
+            createNewTab()
+            popupWindow.dismiss()
         }
 
         // Measure the popup layout
@@ -365,96 +449,8 @@ class HomeActivity : AppCompatActivity() {
         searchUrl = findViewById(R.id.search_et)
         homeBtn = findViewById(R.id.home_btn)
         optionBtn = findViewById(R.id.options_btn)
-        progressBar = findViewById(R.id.progressBar)
         tabBtn = findViewById(R.id.tab_btn)
-        geckoView = findViewById(R.id.geckoview)
-    }
-
-    private fun setupGeckoView() {
-        lifecycleScope.launch {
-            // Get or create the current tab
-            val currentTab = tabManager.getCurrentTab() ?: withContext(Dispatchers.Main) {
-                tabManager.createNewTab("about:blank", "New Tab")
-            }
-
-            session = currentTab.session
-            session.setContentDelegate(object : GeckoSession.ContentDelegate {})
-            session.setProgressDelegate(object: GeckoSession.ProgressDelegate {
-                override fun onProgressChange(session: GeckoSession, progress: Int) {
-                    progressBar.progress = progress
-                    if (progress == 100) progressBar.visibility = ProgressBar.GONE
-                }
-
-                override fun onPageStart(session: GeckoSession, url: String) {
-                    progressBar.visibility = ProgressBar.VISIBLE
-                    progressBar.progress = 0
-                }
-
-                override fun onPageStop(session: GeckoSession, success: Boolean) {
-                    progressBar.visibility = ProgressBar.GONE
-                }
-            })
-
-            session.setNavigationDelegate(object : NavigationDelegate {
-                override fun onLocationChange(session: GeckoSession, url: String?) {
-                    if (url != "about:blank") {
-                        searchUrl.setText(url)
-                        saveHistory(url.toString())
-
-                        // fetch title
-                        session.setContentDelegate(object: GeckoSession.ContentDelegate {
-                            override fun onTitleChange(session: GeckoSession, title: String?) {
-                                currentTab.url = url
-                                currentTab.title = title ?: "New Tab"
-                            }
-                        })
-                    }
-                }
-            })
-
-            if (sRuntime == null) sRuntime = GeckoRuntime.create(this@HomeActivity)
-
-            session.open(sRuntime!!)
-            geckoView.setSession(session)
-
-            // Use imeOptions to handle "Enter" or "Search" button on the keyboard
-            searchUrl.setImeOptions(EditorInfo.IME_ACTION_SEARCH)
-            searchUrl.setOnEditorActionListener { v, actionId, event ->
-                if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-                    // Close keyboard automatically
-                    closeKeyboard()
-
-                    // Handle search action
-                    val url = searchUrl.text.trim().toString()
-
-                    if (url.isNotEmpty()) {
-                        val tab = currentTab
-                        tab.session.loadUri(url)
-
-                        geckoView.visibility = View.VISIBLE
-                        timeTv.visibility = View.GONE
-                        amPmTv.visibility = View.GONE
-                        weather.visibility = View.GONE
-                        session.loadUri(url)
-                        searchUrl.clearFocus()
-
-                        // update tab info
-                        tab.url = url
-                        updateTabCountDisplay()
-                    }
-                    true // Indicate that the action was handled
-                } else {
-                    false
-                }
-            }
-        }
-    }
-
-    private fun saveHistory(url: String) {
-        lifecycleScope.launch {
-            val historyEntry = HistoryEntry(url = url)
-            historyDao.insertHistory(historyEntry)
-        }
+        frameLayout = findViewById(R.id.frag_home)
     }
 
     private fun updateTimeAndWeather() {
@@ -499,15 +495,7 @@ class HomeActivity : AppCompatActivity() {
         })
     }
 
-    private fun closeKeyboard() {
-        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-        imm.hideSoftInputFromWindow(searchUrl.windowToken, 0)
-    }
-
     private fun resetToHomeScreen() {
-        session.close()
-        geckoView.visibility = View.GONE
-
         timeTv.visibility = View.VISIBLE
         amPmTv.visibility = View.VISIBLE
         weather.visibility = View.VISIBLE
@@ -516,9 +504,15 @@ class HomeActivity : AppCompatActivity() {
         updateTimeAndWeather()
     }
 
+    override fun onUrlChanged(url: String) {
+        runOnUiThread {
+            searchUrl.setText(url)
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
-        // Clean up resources when activity is destroyed
-        session.close()
+        // Optional: Shutdown the runtime when the activity is destroyed
+        GeckoRuntimeSingleton.shutdown()
     }
 }

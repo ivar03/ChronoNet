@@ -55,24 +55,12 @@
         android:layout_below="@+id/time_ll"
         android:textAlignment="center"/>
 
-    <org.mozilla.geckoview.GeckoView
-        android:id="@+id/geckoview"
+    <FrameLayout
+        android:id="@+id/frag_home"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:visibility="gone"/>
-
-    <ProgressBar
-        android:id="@+id/progressBar"
-        android:layout_width="match_parent"
-        android:layout_height="3dp"
         android:visibility="gone"
-        android:progress="0"
-        android:max="100"
-        android:progressBackgroundTint="#00000000"
-        android:progressTint="@color/dark_red"
-        style="@android:style/Widget.ProgressBar.Horizontal"
         android:layout_above="@+id/btm_nav"/>
-
 
     <LinearLayout
         android:id="@+id/btm_nav"
